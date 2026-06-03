@@ -1,11 +1,11 @@
 """
 Phase 4 — Train Context Gating Module + Ablation E0–E5
 ========================================================
-Chạy:
+Run:
   python scripts/phase4_train_cgm.py
 
-Đọc outputs/cache/ từ Phase 3, train 6 ablation experiments:
-  E0: X3D-S only (baseline — đã có từ Phase 2)
+Read outputs/cache/ from Phase 3 and train 6 ablation experiments:
+  E0: X3D-S only (baseline from Phase 2)
   E1: + crowd stream only
   E2: + lighting stream only
   E3: + motion stream only
@@ -37,13 +37,13 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class ContextGatingModule(nn.Module):
     """
-    Trái tim của pipeline.
-    Input:  13-dim context vector (hoặc subset)
+    Core module of the pipeline.
+    Input:  13-dim context vector or a selected subset
     Output: p_final = α · p_base + (1-α) · p_ctx
     """
     def __init__(self, input_dim: int):
         super().__init__()
-        # MLP-gate → α: mức tin X3D-S
+        # MLP gate -> alpha: confidence in X3D-S.
         self.gate = nn.Sequential(
             nn.Linear(input_dim, 32),
             nn.ReLU(),
@@ -51,7 +51,7 @@ class ContextGatingModule(nn.Module):
             nn.Linear(32, 1),
             nn.Sigmoid(),
         )
-        # MLP-ctx → p_ctx: xác suất hiệu chỉnh từ context
+        # Context MLP -> p_ctx: context-calibrated probability.
         self.ctx = nn.Sequential(
             nn.Linear(input_dim, 32),
             nn.ReLU(),
@@ -71,7 +71,7 @@ class ContextGatingModule(nn.Module):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 2. Load cached data từ Phase 3
+# 2. Load cached data from Phase 3.
 # ═══════════════════════════════════════════════════════════════════════════
 
 def load_cache():
@@ -90,18 +90,18 @@ def load_cache():
 
 
 def split_data(data, split_id):
-    """Trả về subset theo split: 0=train, 1=val, 2=test"""
+    """Return a subset by split: 0=train, 1=val, 2=test."""
     mask = data["splits"] == split_id
     return {k: v[mask] for k, v in data.items()}
 
 
 def build_context_vector(data, streams):
     """
-    Xây context vector dựa trên streams được chọn.
-    streams: list gồm 'crowd', 'light', 'motion'
-    Luôn bao gồm p_base (1-dim) làm feature đầu tiên.
+    Build a context vector from the selected streams.
+    streams: list containing 'crowd', 'light', and/or 'motion'.
+    Always include p_base as the first 1-dimensional feature.
     """
-    parts = [data["p_base"].reshape(-1, 1)]  # p_base luôn có
+    parts = [data["p_base"].reshape(-1, 1)]  # Always include p_base.
     if "crowd"  in streams: parts.append(data["z_crowd"])
     if "light"  in streams: parts.append(data["z_light"])
     if "motion" in streams: parts.append(data["z_motion"])
@@ -114,7 +114,7 @@ def build_context_vector(data, streams):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 3. Train loop cho CGM
+# 3. CGM train loop.
 # ═══════════════════════════════════════════════════════════════════════════
 
 def compute_metrics(labels, probs, threshold=0.5):
@@ -141,7 +141,7 @@ def train_cgm(
     lr: float = 1e-3,
     exp_name: str = "E?",
 ):
-    """Train CGM trên một cấu hình ablation cụ thể."""
+    """Train CGM for a specific ablation configuration."""
     # Build context vectors
     X_raw, scaler = build_context_vector(train_data, streams)
     scaler.fit(X_raw)
@@ -180,7 +180,7 @@ def train_cgm(
     patience_counter = 0
 
     for epoch in range(1, epochs + 1):
-        # ── Train ──
+        # Train.
         model.train()
         p_final, alpha, p_ctx = model(X_train, p_base_train)
         loss_raw = criterion(p_final, y_train)
@@ -192,7 +192,7 @@ def train_cgm(
         loss.backward()
         optimizer.step()
 
-        # ── Val ──
+        # Validate.
         model.eval()
         with torch.no_grad():
             p_final_val, alpha_val, _ = model(X_val, p_base_val)
@@ -218,7 +218,7 @@ def train_cgm(
             print(f"  [{exp_name}] Early stop at epoch {epoch}")
             break
 
-    # ── Test với best model ──
+    # Test with the best model.
     model.load_state_dict(best_state)
     model.eval()
     with torch.no_grad():
@@ -256,7 +256,7 @@ def train_cgm(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 4. Chạy 6 Ablation Experiments
+# 4. Run 6 ablation experiments.
 # ═══════════════════════════════════════════════════════════════════════════
 
 def run_ablation():
@@ -272,7 +272,7 @@ def run_ablation():
     val_d   = split_data(data, 1)
     test_d  = split_data(data, 2)
 
-    # E0: X3D-S only (từ Phase 2)
+    # E0: X3D-S only from Phase 2.
     e0_path = results_dir / "E0_baseline.json"
     if e0_path.exists():
         with open(e0_path) as f:
@@ -282,7 +282,7 @@ def run_ablation():
         print(f"  Acc:{e0_m.get('accuracy','?')}  F1:{e0_m.get('f1','?')}  "
               f"FPR:{e0_m.get('fpr','?')}  FNR:{e0_m.get('fnr','?')}")
     else:
-        # Tính E0 từ p_base trực tiếp
+        # Compute E0 directly from p_base.
         test_probs = test_d["p_base"].tolist()
         test_labels = test_d["labels"].tolist()
         e0_m = compute_metrics(test_labels, test_probs)
@@ -290,7 +290,7 @@ def run_ablation():
         print(f"  Acc:{e0_m['accuracy']}  F1:{e0_m['f1']}  "
               f"FPR:{e0_m['fpr']}  FNR:{e0_m['fnr']}")
 
-    # 5 ablation experiments
+    # Five ablation experiments.
     experiments = [
         ("E1", ["crowd"],                     1.0),
         ("E2", ["light"],                     1.0),

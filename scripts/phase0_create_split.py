@@ -1,21 +1,21 @@
 """
-Phase 0 — Step 4: Tạo train/val/test split 70/15/15
+Phase 0 — Step 4: Create train/val/test split 70/15/15
 =====================================================
-Chạy:
+Run:
   python scripts/phase0_create_split.py ^
     --root data/raw/RWF-2000 ^
     --out data/processed/splits/rwf2000_split.json ^
     --seed 42
 
-RWF-2000 gốc chỉ có train (1600) và val (400).
-Script này:
-  - Gộp tất cả 2000 clip lại
-  - Chia stratified 70/15/15 (1400/300/300)
-  - Lưu vào data/processed/splits/rwf2000_split.json để tất cả experiment dùng chung
+The original RWF-2000 layout only provides train (1600) and val (400).
+This script:
+  - Merges all 2000 clips
+  - Creates a stratified 70/15/15 split (1400/300/300)
+  - Saves data/processed/splits/rwf2000_split.json for all experiments
 
-Tại sao cần split.json?
-  Đảm bảo mọi model (M1, M2, M3, M4) đều train và test trên
-  đúng cùng một tập dữ liệu. Không có điều này, so sánh không fair.
+Why split.json matters:
+  It ensures every model (M1, M2, M3, M4) trains and tests on the same
+  dataset partition. Without it, model comparisons are not fair.
 """
 
 import json
@@ -35,7 +35,7 @@ LABEL_MAP = {
 
 
 def collect_clips(root: Path) -> dict[str, list[str]]:
-    """Thu thập clip theo nhãn, bỏ qua tên split gốc (train/val)"""
+    """Collect clips by label while ignoring the original train/val folders."""
     clips_by_label: dict[str, list[str]] = defaultdict(list)
 
     for split_dir in ["train", "val"]:
@@ -45,7 +45,7 @@ def collect_clips(root: Path) -> dict[str, list[str]]:
                 continue
             for f in folder.iterdir():
                 if f.suffix.lower() in VIDEO_EXTS:
-                    # Lưu path tương đối để portable
+                    # Store a portable relative path.
                     clips_by_label[label].append(
                         f.relative_to(root).as_posix()
                     )
@@ -59,7 +59,7 @@ def stratified_split(
     val_ratio:   float = 0.15,
     seed:        int   = 42,
 ) -> dict:
-    """Split stratified — mỗi class có tỉ lệ train/val/test như nhau"""
+    """Create a stratified split with the same ratio for each class."""
     rng = random.Random(seed)
     split = {"train": [], "val": [], "test": []}
 
@@ -78,7 +78,7 @@ def stratified_split(
         split["test"]  += [{"path": p, "label": LABEL_MAP[label]}
                            for p in shuffled[n_train + n_val:]]
 
-    # Shuffle lại để không theo nhóm label
+    # Shuffle again so samples are not grouped by label.
     for s in split:
         rng.shuffle(split[s])
 
@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
     print_summary(split)
 
-    # Thêm metadata vào file
+    # Add split metadata.
     output = {
         "meta": {
             "dataset":     "RWF-2000",
@@ -147,4 +147,4 @@ if __name__ == "__main__":
         json.dump(output, f, indent=2)
 
     print(f"  Saved → {out}")
-    print(f"  Dùng file này cho tất cả model M1, M2, M3, M4.\n")
+    print(f"  Use this file for all models M1, M2, M3, M4.\n")

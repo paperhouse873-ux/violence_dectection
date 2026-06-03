@@ -1,12 +1,12 @@
 """
-Phase 0 — Step 3: Thống kê dataset (duration, fps, resolution, class dist)
+Phase 0 — Step 3: Compute dataset statistics (duration, fps, resolution, class distribution)
 ============================================================================
-Chạy:
+Run:
   python scripts/phase0_statistics.py --root data/raw/RWF-2000
 
 Output:
-  - In bảng thống kê ra terminal
-  - Lưu reports/dataset/dataset_stats.csv
+  - Print statistics to the terminal
+  - Save reports/dataset/dataset_stats.csv
 """
 
 import cv2
@@ -119,10 +119,10 @@ if __name__ == "__main__":
 
     df = pd.DataFrame(records)
 
-    # In thống kê
+    # Print statistics.
     print_stats(df)
 
-    # Lưu CSV
+    # Save CSV.
     out = PROJECT_ROOT / "reports" / "dataset" / "dataset_stats.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)

@@ -9,7 +9,7 @@ Models (all 2022+, timm pretrained, A100-compatible):
 Architecture: per-frame 2D CNN → LSTM temporal → binary classifier
 Proven approach: no HuggingFace API complexity, no shape issues.
 
-Chạy:
+Run:
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
   python scripts/phase5_modern_detectors.py \
     --root data/raw/RWF-2000 \
@@ -196,7 +196,7 @@ def evaluate(model, loader, criterion, desc="Val"):
 
 
 def build_dataloader(root, split_file, split, batch_size, img_size, augment):
-    """DataLoader với img_size tuỳ chỉnh theo model."""
+    """Build a DataLoader with model-specific img_size."""
     ds = RWF2000Dataset(
         root=root, split_file=split_file,
         split=split, img_size=img_size, augment=augment,
@@ -404,7 +404,7 @@ def main(args):
         print(f"  ## {name} — {cfg['paper']}")
         print(f"  {'#'*65}")
 
-        # DataLoaders với img_size riêng của từng model
+        # DataLoaders with model-specific image size.
         img_size = cfg["img_size"]
         print(f"\n  Loading datasets (img_size={img_size})...")
         train_loader = build_dataloader(args.root, args.split, "train",

@@ -1,7 +1,7 @@
 """
-Phase 0 — Step 1: Kiểm tra cấu trúc thư mục RWF-2000
+Phase 0 — Step 1: Check RWF-2000 folder structure
 ======================================================
-Chạy:
+Run:
   python scripts/phase0_check_structure.py --root data/raw/RWF-2000
 """
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 from _bootstrap import PROJECT_ROOT
 
-# ── Cấu trúc RWF-2000 đúng chuẩn ──────────────────────────────────────────
+# Expected RWF-2000 folder structure.
 EXPECTED = {
     "train/fight":    800,   # 800 clip violent
     "train/nonFight": 800,   # 800 clip non-violent
@@ -38,7 +38,7 @@ def check_structure(root: Path):
             all_ok = False
             continue
 
-        # Đếm file video
+        # Count video files.
         files = [f for f in folder.iterdir()
                  if f.suffix.lower() in VIDEO_EXTS]
         n = len(files)
@@ -65,6 +65,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root", type=str,
                         default=str(PROJECT_ROOT / "data" / "raw" / "RWF-2000"),
-                        help="Path đến thư mục gốc RWF-2000")
+                        help="Path to the RWF-2000 root folder")
     args = parser.parse_args()
     check_structure(Path(args.root))

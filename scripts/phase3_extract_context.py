@@ -1,27 +1,27 @@
 """
-Phase 3 — Extract 3 Context Streams từ toàn bộ RWF-2000
+Phase 3 — Extract 3 context streams from all RWF-2000 clips
 =========================================================
-Chạy:
+Run:
   python scripts/phase3_extract_context.py ^
     --root data/raw/RWF-2000 ^
     --split data/processed/splits/rwf2000_split.json ^
     --ckpt outputs/checkpoints/x3ds_best.pth
 
-Output (lưu vào outputs/cache/):
+Output saved to outputs/cache/:
   outputs/cache/p_base.npy        (N,)    — X3D-S violence probability
   outputs/cache/z_crowd.npy       (N, 4)  — crowd density features
   outputs/cache/z_light.npy       (N, 4)  — lighting features
   outputs/cache/z_motion.npy      (N, 4)  — motion + synchrony features
-  outputs/cache/labels.npy        (N,)    — ground truth labels
+  outputs/cache/labels.npy        (N,)    — ground-truth labels
   outputs/cache/splits.npy        (N,)    — 0=train, 1=val, 2=test
-  outputs/cache/context_13dim.npy (N,13)  — concat + standardized
-  outputs/cache/scaler.pkl                — StandardScaler fit trên train
+  outputs/cache/context_13dim.npy (N,13)  — concatenated and standardized features
+  outputs/cache/scaler.pkl                — StandardScaler fitted on train
 
-Thời gian ước tính:
-  p_base   : ~30 phút (GPU)
-  z_crowd  : ~45 phút (CPU, YOLO)
-  z_light  : ~5  phút (CPU, OpenCV)
-  z_motion : ~20 phút (CPU, Farneback)
+Estimated runtime:
+  p_base   : ~30 minutes (GPU)
+  z_crowd  : ~45 minutes (CPU, YOLO)
+  z_light  : ~5 minutes (CPU, OpenCV)
+  z_motion : ~20 minutes (CPU, Farneback)
 """
 
 import cv2
@@ -48,7 +48,7 @@ print(f"\n  Device: {DEVICE}")
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# STREAM 1 — p_base từ X3D-S (frozen)
+# STREAM 1 — p_base from frozen X3D-S.
 # ═══════════════════════════════════════════════════════════════════════════
 
 def load_frozen_x3ds(ckpt_path: str) -> nn.Module:
@@ -74,7 +74,7 @@ def load_frozen_x3ds(ckpt_path: str) -> nn.Module:
 
 @torch.no_grad()
 def extract_p_base(model, dataset, batch_size=8) -> np.ndarray:
-    """Trích xuất p_base từ X3D-S cho toàn bộ dataset."""
+    """Extract p_base from X3D-S for the full dataset."""
     loader = DataLoader(dataset, batch_size=batch_size,
                         shuffle=False, num_workers=0)
     all_probs = []
@@ -93,8 +93,8 @@ def extract_p_base(model, dataset, batch_size=8) -> np.ndarray:
 def extract_crowd_features(video_path: str,
                            sample_every: int = 4) -> np.ndarray:
     """
-    Chạy YOLOv8n mỗi `sample_every` frames, đếm class=person.
-    Trả về z_crowd (4,): [mean_count, max_count, count_variance, density_area]
+    Run YOLOv8n every `sample_every` frames and count class=person.
+    Return z_crowd (4,): [mean_count, max_count, count_variance, density_area].
     """
     from ultralytics import YOLO
     if not hasattr(extract_crowd_features, "_model"):
@@ -145,8 +145,8 @@ def extract_crowd_features(video_path: str,
 
 def extract_lighting_features(video_path: str) -> np.ndarray:
     """
-    Dùng OpenCV tính đặc trưng ánh sáng.
-    Trả về z_light (4,): [mean_brightness, contrast_std, blur_score, low_light_ratio]
+    Use OpenCV to compute lighting features.
+    Return z_light (4,): [mean_brightness, contrast_std, blur_score, low_light_ratio].
     """
     cap = cv2.VideoCapture(video_path)
     brightness_list, contrast_list, blur_list, dark_list = [], [], [], []
@@ -162,11 +162,11 @@ def extract_lighting_features(video_path: str) -> np.ndarray:
         brightness_list.append(float(mean[0][0]))
         contrast_list.append(float(std[0][0]))
 
-        # Blur score (Laplacian variance — thấp = mờ)
+        # Blur score: lower Laplacian variance means blurrier frames.
         blur = cv2.Laplacian(gray, cv2.CV_64F).var()
         blur_list.append(blur)
 
-        # Low light ratio (tỷ lệ pixel tối dưới ngưỡng 50/255)
+        # Low-light ratio: fraction of pixels below threshold 50/255.
         dark_ratio = np.mean(gray < 50)
         dark_list.append(dark_ratio)
 
@@ -189,12 +189,12 @@ def extract_lighting_features(video_path: str) -> np.ndarray:
 
 def extract_motion_features(video_path: str) -> np.ndarray:
     """
-    Dùng Farneback optical flow.
-    Trả về z_motion (4,):
+    Use Farneback optical flow.
+    Return z_motion (4,):
       [motion_mean, motion_peak, direction_entropy, motion_synchrony★]
 
-    motion_synchrony: 1 = tất cả chuyển động cùng hướng (nhảy múa)
-                      0 = chuyển động hỗn loạn (bạo lực)
+    motion_synchrony: 1 = all movement follows a similar direction
+                      0 = movement is chaotic
     """
     cap = cv2.VideoCapture(video_path)
     ret, prev = cap.read()
@@ -220,18 +220,18 @@ def extract_motion_features(video_path: str) -> np.ndarray:
         mag, ang = cv2.cartToPolar(flow[..., 0], flow[..., 1])
         magnitudes.append(float(mag.mean()))
 
-        # Direction entropy — cao = hỗn loạn
+        # Direction entropy: higher values indicate more chaotic motion.
         hist, _ = np.histogram(ang.flatten(), bins=8, range=(0, 2*np.pi))
         hist = hist / (hist.sum() + 1e-8)
         entropy = -np.sum(hist * np.log(hist + 1e-8))
         entropies.append(entropy)
 
-        # Motion synchrony — circular variance của hướng
+        # Motion synchrony based on circular variance of directions.
         # synchrony = 1 - circular_variance
         # circular_variance = 1 - |mean(exp(i*theta))|
         theta = ang.flatten()
         r = np.abs(np.mean(np.exp(1j * theta)))  # [0,1]
-        synchronies.append(float(r))             # 1=đồng bộ, 0=hỗn loạn
+        synchronies.append(float(r))             # 1=synchronized, 0=chaotic
 
         prev_gray = curr_gray
 
@@ -250,7 +250,7 @@ def extract_motion_features(video_path: str) -> np.ndarray:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# MAIN — Chạy toàn bộ extraction pipeline
+# MAIN — Run the full extraction pipeline.
 # ═══════════════════════════════════════════════════════════════════════════
 
 def run_extraction(args):
@@ -261,7 +261,7 @@ def run_extraction(args):
     with open(args.split) as f:
         split_data = json.load(f)
 
-    # Gộp tất cả samples với split label
+    # Merge all samples and keep their split IDs.
     all_samples = []
     split_ids   = []
     for sid, sname in enumerate(["train", "val", "test"]):
@@ -273,7 +273,7 @@ def run_extraction(args):
     root = Path(args.root)
     print(f"\n  Total clips to process: {N}")
 
-    # ── STREAM 1: p_base từ X3D-S ─────────────────────────────────────
+    # STREAM 1: p_base from X3D-S.
     p_base_path = cache_dir / "p_base.npy"
     if p_base_path.exists() and not args.force:
         print(f"\n  [SKIP] p_base already cached.")
@@ -320,7 +320,7 @@ def run_extraction(args):
         np.save(p_base_path, p_base)
         print(f"  Saved → {p_base_path}  shape={p_base.shape}")
 
-    # ── STREAM 2: z_crowd ─────────────────────────────────────────────
+    # STREAM 2: z_crowd.
     z_crowd_path = cache_dir / "z_crowd.npy"
     if z_crowd_path.exists() and not args.force:
         print(f"\n  [SKIP] z_crowd already cached.")
@@ -334,7 +334,7 @@ def run_extraction(args):
         np.save(z_crowd_path, z_crowd)
         print(f"  Saved → {z_crowd_path}  shape={z_crowd.shape}")
 
-    # ── STREAM 3: z_light ─────────────────────────────────────────────
+    # STREAM 3: z_light.
     z_light_path = cache_dir / "z_light.npy"
     if z_light_path.exists() and not args.force:
         print(f"\n  [SKIP] z_light already cached.")
@@ -348,7 +348,7 @@ def run_extraction(args):
         np.save(z_light_path, z_light)
         print(f"  Saved → {z_light_path}  shape={z_light.shape}")
 
-    # ── STREAM 4: z_motion ────────────────────────────────────────────
+    # STREAM 4: z_motion.
     z_motion_path = cache_dir / "z_motion.npy"
     if z_motion_path.exists() and not args.force:
         print(f"\n  [SKIP] z_motion already cached.")
@@ -362,22 +362,22 @@ def run_extraction(args):
         np.save(z_motion_path, z_motion)
         print(f"  Saved → {z_motion_path}  shape={z_motion.shape}")
 
-    # ── Labels & splits ───────────────────────────────────────────────
+    # Labels and splits.
     labels = np.array([s["label"] for s in all_samples], dtype=np.int32)
     splits = np.array(split_ids, dtype=np.int32)
     np.save(cache_dir / "labels.npy", labels)
     np.save(cache_dir / "splits.npy", splits)
 
-    # ── Concat + Standardize → 13-dim ─────────────────────────────────
+    # Concatenate and standardize into a 13-dimensional context vector.
     print(f"\n  Building 13-dim context vector...")
     X_raw = np.concatenate([
         p_base.reshape(-1, 1),  # 1-dim
         z_crowd,                # 4-dim
         z_light,                # 4-dim
         z_motion,               # 4-dim
-    ], axis=1)                  # → (N, 13)
+    ], axis=1)                  # -> (N, 13)
 
-    # Fit StandardScaler ONLY trên train set
+    # Fit StandardScaler only on the train set.
     train_mask = splits == 0
     scaler = StandardScaler()
     scaler.fit(X_raw[train_mask])
@@ -387,7 +387,7 @@ def run_extraction(args):
     with open(cache_dir / "scaler.pkl", "wb") as f:
         pickle.dump(scaler, f)
 
-    # ── Sanity check ──────────────────────────────────────────────────
+    # Sanity check.
     print(f"\n  {'='*55}")
     print(f"  Extraction complete — Sanity check")
     print(f"  {'='*55}")
@@ -403,7 +403,7 @@ def run_extraction(args):
     print(f"  Violent clips  synchrony: {sync_col[labels==1].mean():.4f}")
     print(f"  Normal  clips  synchrony: {sync_col[labels==0].mean():.4f}")
     if sync_col[labels==0].mean() > sync_col[labels==1].mean():
-        print(f"  PASS — Normal > Violent (nhảy múa đồng bộ hơn bạo lực)")
+        print(f"  PASS — Normal > Violent (normal clips are more synchronized)")
     else:
         print(f"  NOTE — Unexpected direction, check feature logic")
 
@@ -419,6 +419,6 @@ if __name__ == "__main__":
     parser.add_argument("--ckpt",  type=str,
                         default=str(PROJECT_ROOT / "outputs" / "checkpoints" / "x3ds_best.pth"))
     parser.add_argument("--force", action="store_true",
-                        help="Re-extract tất cả dù đã có cache")
+                        help="Re-extract all features even when cache files already exist")
     args = parser.parse_args()
     run_extraction(args)

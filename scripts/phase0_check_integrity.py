@@ -1,14 +1,14 @@
 """
-Phase 0 — Step 2: Kiểm tra tính toàn vẹn (detect file lỗi/corrupt)
+Phase 0 — Step 2: Check video file integrity
 ====================================================================
-Chạy:
+Run:
   python scripts/phase0_check_integrity.py --root data/raw/RWF-2000
 
-Cách hoạt động:
-  - Mở từng file video bằng OpenCV
-  - Đọc thử frame đầu + frame cuối
-  - Kiểm tra số frame > 0
-  - Ghi lại file lỗi vào reports/dataset/corrupted_files.txt
+Workflow:
+  - Open each video file with OpenCV
+  - Read the first and last frames
+  - Verify that frame count is greater than 0
+  - Save corrupted file records to reports/dataset/corrupted_files.txt
 """
 
 import os
@@ -23,7 +23,7 @@ VIDEO_EXTS = {".avi", ".mp4", ".mov", ".mkv"}
 
 
 def is_valid_video(path: Path) -> tuple[bool, str]:
-    """Trả về (is_valid, error_message)"""
+    """Return (is_valid, error_message)."""
     cap = cv2.VideoCapture(str(path))
     if not cap.isOpened():
         return False, "Cannot open file"
@@ -33,13 +33,13 @@ def is_valid_video(path: Path) -> tuple[bool, str]:
         cap.release()
         return False, f"Frame count = {total_frames}"
 
-    # Đọc thử frame đầu tiên
+    # Read the first frame.
     ret, frame = cap.read()
     if not ret or frame is None:
         cap.release()
         return False, "Cannot read first frame"
 
-    # Đọc thử frame cuối
+    # Read the last frame.
     cap.set(cv2.CAP_PROP_POS_FRAMES, total_frames - 1)
     ret, frame = cap.read()
     if not ret or frame is None:
@@ -55,7 +55,7 @@ def check_integrity(root: Path):
     print(f"  RWF-2000 Integrity Check")
     print(f"{'='*55}\n")
 
-    # Thu thập tất cả file video
+    # Collect all video files.
     all_files = []
     for folder in root.rglob("*"):
         if folder.is_dir():
@@ -71,7 +71,7 @@ def check_integrity(root: Path):
         if not valid:
             corrupted.append((str(path), err))
 
-    # Kết quả
+    # Results.
     n_ok   = len(all_files) - len(corrupted)
     n_bad  = len(corrupted)
 

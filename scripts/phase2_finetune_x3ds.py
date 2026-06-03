@@ -1,13 +1,13 @@
 """
-Phase 2 — Fine-tune X3D-S trên RWF-2000 (FIXED)
+Phase 2 — Fine-tune X3D-S on RWF-2000 (fixed)
 ==================================================
-Fix quan trọng:
-  1. Xóa Softmax bên trong X3D head (model.blocks[-1].act = Identity)
-     -> X3D head có Softmax, với 1 output thì softmax luôn = 1.0
-  2. Dùng BCEWithLogitsLoss thay BCELoss
-  3. Không apply sigmoid 2 lần (truyền logits trực tiếp vào loss)
+Important fixes:
+  1. Remove Softmax inside the X3D head (model.blocks[-1].act = Identity)
+     -> X3D head has Softmax, so one output would always become 1.0
+  2. Use BCEWithLogitsLoss instead of BCELoss
+  3. Avoid applying sigmoid twice by passing logits directly to the loss
 
-Chạy:
+Run:
   python scripts/phase2_finetune_x3ds.py ^
     --root data/raw/RWF-2000 ^
     --split data/processed/splits/rwf2000_split.json ^
@@ -37,7 +37,7 @@ if torch.cuda.is_available():
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 1. Load X3D-S + sửa head
+# 1. Load X3D-S and replace the head.
 # ═══════════════════════════════════════════════════════════════════════════
 
 def build_x3ds_model() -> nn.Module:
@@ -48,11 +48,11 @@ def build_x3ds_model() -> nn.Module:
     in_features = model.blocks[-1].proj.in_features
     print(f"  Original head: Linear({in_features} -> 400) + Softmax")
 
-    # FIX 1: thay proj thành 1 output
+    # Fix 1: replace projection with one output.
     model.blocks[-1].proj = nn.Linear(in_features, 1)
-    # FIX 2: XÓA Softmax bên trong head (nguyên nhân FPR=1.0)
+    # Fix 2: remove Softmax inside the head, which caused FPR=1.0.
     model.blocks[-1].activation = nn.Identity()
-    # Một số version đặt tên khác — set cả 2 cho chắc
+    # Some versions use a different attribute name, so set both.
     if hasattr(model.blocks[-1], "act"):
         model.blocks[-1].act = nn.Identity()
 
@@ -85,7 +85,7 @@ def compute_metrics(labels, probs, threshold=0.5):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 3. Train một epoch
+# 3. Train one epoch.
 # ═══════════════════════════════════════════════════════════════════════════
 
 def train_one_epoch(model, loader, optimizer, criterion, epoch):
@@ -99,12 +99,12 @@ def train_one_epoch(model, loader, optimizer, criterion, epoch):
         labels = labels.float().to(DEVICE)
 
         optimizer.zero_grad()
-        logits = model(videos).squeeze(1)       # KHÔNG sigmoid ở đây
-        loss = criterion(logits, labels)        # BCEWithLogitsLoss tự xử lý
+        logits = model(videos).squeeze(1)       # No sigmoid here.
+        loss = criterion(logits, labels)        # BCEWithLogitsLoss handles it.
         loss.backward()
         optimizer.step()
 
-        probs = torch.sigmoid(logits.detach())  # chỉ để tính metric
+        probs = torch.sigmoid(logits.detach())  # Only for metrics.
         total_loss += loss.item()
         all_labels.extend(labels.cpu().tolist())
         all_probs.extend(probs.cpu().tolist())
