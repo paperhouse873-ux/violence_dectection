@@ -1,11 +1,12 @@
 """
 Phase 0 — Step 3: Thống kê dataset (duration, fps, resolution, class dist)
 ============================================================================
-Chạy: python phase0_step3_statistics.py --root /path/to/RWF-2000
+Chạy:
+  python scripts/phase0_statistics.py --root data/raw/RWF-2000
 
 Output:
   - In bảng thống kê ra terminal
-  - Lưu dataset_stats.csv
+  - Lưu reports/dataset/dataset_stats.csv
 """
 
 import cv2
@@ -16,6 +17,8 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 from collections import defaultdict
+
+from _bootstrap import PROJECT_ROOT
 
 VIDEO_EXTS = {".avi", ".mp4", ".mov", ".mkv"}
 
@@ -100,7 +103,8 @@ def print_stats(df: pd.DataFrame):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, default="./RWF-2000")
+    parser.add_argument("--root", type=str,
+                        default=str(PROJECT_ROOT / "data" / "raw" / "RWF-2000"))
     args = parser.parse_args()
     root = Path(args.root)
 
@@ -119,7 +123,8 @@ if __name__ == "__main__":
     print_stats(df)
 
     # Lưu CSV
-    out = Path("dataset_stats.csv")
+    out = PROJECT_ROOT / "reports" / "dataset" / "dataset_stats.csv"
+    out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(out, index=False)
     print(f"  Saved → {out}")
     print(f"  Columns: {list(df.columns)}\n")

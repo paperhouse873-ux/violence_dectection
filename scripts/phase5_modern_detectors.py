@@ -11,9 +11,9 @@ Proven approach: no HuggingFace API complexity, no shape issues.
 
 Chạy:
   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True \
-  python phase5_mvit_swin.py \
-    --root "/workspace/RWF2000_full/RWF-2000" \
-    --split "/workspace/code/split.json" \
+  python scripts/phase5_modern_detectors.py \
+    --root data/raw/RWF-2000 \
+    --split data/processed/splits/rwf2000_split.json \
     --epochs 20 --batch_size 4
 """
 
@@ -31,9 +31,12 @@ from sklearn.metrics import (
 )
 from sklearn.preprocessing import StandardScaler
 
-import sys
-sys.path.append(str(Path(__file__).parent))
-from phase1_dataset import RWF2000Dataset
+from _bootstrap import PROJECT_ROOT
+from violence_detection.datasets.rwf2000 import (
+    KINETICS_MEAN,
+    KINETICS_STD,
+    RWF2000Dataset,
+)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"\n  Device: {DEVICE}")
@@ -261,7 +264,6 @@ class AllSamplesDS(torch.utils.data.Dataset):
             for item in data[sname]:
                 self.samples.append(item)
                 self.split_ids.append(sid)
-        from phase1_dataset import KINETICS_MEAN, KINETICS_STD
         self.mean = torch.tensor(KINETICS_MEAN).view(3, 1, 1, 1)
         self.std  = torch.tensor(KINETICS_STD).view(3, 1, 1, 1)
 
@@ -387,9 +389,12 @@ def train_cgm(p_base_all, labels_all, splits_all, cache_dir, name):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main(args):
-    ckpt_dir    = Path("checkpoints"); ckpt_dir.mkdir(exist_ok=True)
-    results_dir = Path("results");     results_dir.mkdir(exist_ok=True)
-    cache_dir   = Path("cache")
+    ckpt_dir = PROJECT_ROOT / "outputs" / "checkpoints"
+    results_dir = PROJECT_ROOT / "outputs" / "results"
+    cache_dir = PROJECT_ROOT / "outputs" / "cache"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
     all_results = []
 
@@ -517,8 +522,8 @@ def main(args):
                 c.get("accuracy",""), c.get("f1",""), c.get("fpr",""),
                 r["fpr_delta"], r["fpr_rel_pct"]])
 
-    print(f"\n  Saved → results/phase5_results.json")
-    print(f"  Saved → results/phase5_table.csv")
+    print(f"\n  Saved → {results_dir / 'phase5_results.json'}")
+    print(f"  Saved → {results_dir / 'phase5_table.csv'}")
     print(f"  Phase 5 DONE.\n")
 
 

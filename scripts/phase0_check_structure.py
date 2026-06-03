@@ -1,17 +1,19 @@
 """
 Phase 0 — Step 1: Kiểm tra cấu trúc thư mục RWF-2000
 ======================================================
-Chạy: python phase0_step1_check_structure.py --root /path/to/RWF-2000
+Chạy:
+  python scripts/phase0_check_structure.py --root data/raw/RWF-2000
 """
 
-import os
 import argparse
 from pathlib import Path
 
+from _bootstrap import PROJECT_ROOT
+
 # ── Cấu trúc RWF-2000 đúng chuẩn ──────────────────────────────────────────
 EXPECTED = {
-    "train/fight":    1000,  # 1000 clip violent
-    "train/nonFight": 1000,  # 1000 clip non-violent
+    "train/fight":    800,   # 800 clip violent
+    "train/nonFight": 800,   # 800 clip non-violent
     "val/fight":      200,   # 200 clip violent
     "val/nonFight":   200,   # 200 clip non-violent
 }
@@ -53,7 +55,7 @@ def check_structure(root: Path):
                   else f"             Extra {-diff} files.")
 
     print(f"\n{'─'*55}")
-    print(f"  Total videos found: {total}  (expected 2400)")
+    print(f"  Total videos found: {total}  (expected 2000)")
     print(f"  Overall:            {'PASS' if all_ok else 'FAIL — fix issues above'}")
     print(f"{'='*55}\n")
     return all_ok
@@ -61,7 +63,8 @@ def check_structure(root: Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, default="./RWF-2000",
+    parser.add_argument("--root", type=str,
+                        default=str(PROJECT_ROOT / "data" / "raw" / "RWF-2000"),
                         help="Path đến thư mục gốc RWF-2000")
     args = parser.parse_args()
     check_structure(Path(args.root))

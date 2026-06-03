@@ -1,13 +1,17 @@
 """
 Phase 0 — Step 4: Tạo train/val/test split 70/15/15
 =====================================================
-Chạy: python phase0_step4_split.py --root /path/to/RWF-2000 --seed 42
+Chạy:
+  python scripts/phase0_create_split.py ^
+    --root data/raw/RWF-2000 ^
+    --out data/processed/splits/rwf2000_split.json ^
+    --seed 42
 
 RWF-2000 gốc chỉ có train (1600) và val (400).
 Script này:
   - Gộp tất cả 2000 clip lại
   - Chia stratified 70/15/15 (1400/300/300)
-  - Lưu vào split.json để tất cả experiment dùng chung
+  - Lưu vào data/processed/splits/rwf2000_split.json để tất cả experiment dùng chung
 
 Tại sao cần split.json?
   Đảm bảo mọi model (M1, M2, M3, M4) đều train và test trên
@@ -19,6 +23,8 @@ import random
 import argparse
 from pathlib import Path
 from collections import defaultdict
+
+from _bootstrap import PROJECT_ROOT
 
 VIDEO_EXTS = {".avi", ".mp4", ".mov", ".mkv"}
 
@@ -41,7 +47,7 @@ def collect_clips(root: Path) -> dict[str, list[str]]:
                 if f.suffix.lower() in VIDEO_EXTS:
                     # Lưu path tương đối để portable
                     clips_by_label[label].append(
-                        str(f.relative_to(root))
+                        f.relative_to(root).as_posix()
                     )
 
     return dict(clips_by_label)
@@ -95,7 +101,10 @@ def print_summary(split: dict):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root",  type=str, default="./RWF-2000")
+    parser.add_argument("--root",  type=str,
+                        default=str(PROJECT_ROOT / "data" / "raw" / "RWF-2000"))
+    parser.add_argument("--out", type=str,
+                        default=str(PROJECT_ROOT / "data" / "processed" / "splits" / "rwf2000_split.json"))
     parser.add_argument("--seed",  type=int, default=42)
     parser.add_argument("--train", type=float, default=0.70)
     parser.add_argument("--val",   type=float, default=0.15)
@@ -132,7 +141,8 @@ if __name__ == "__main__":
         "test":  split["test"],
     }
 
-    out = Path("split.json")
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:
         json.dump(output, f, indent=2)
 

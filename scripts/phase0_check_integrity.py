@@ -1,13 +1,14 @@
 """
 Phase 0 — Step 2: Kiểm tra tính toàn vẹn (detect file lỗi/corrupt)
 ====================================================================
-Chạy: python phase0_step2_integrity.py --root /path/to/RWF-2000
+Chạy:
+  python scripts/phase0_check_integrity.py --root data/raw/RWF-2000
 
 Cách hoạt động:
   - Mở từng file video bằng OpenCV
   - Đọc thử frame đầu + frame cuối
   - Kiểm tra số frame > 0
-  - Ghi lại file lỗi vào corrupted_files.txt
+  - Ghi lại file lỗi vào reports/dataset/corrupted_files.txt
 """
 
 import os
@@ -15,6 +16,8 @@ import cv2
 import argparse
 from pathlib import Path
 from tqdm import tqdm
+
+from _bootstrap import PROJECT_ROOT
 
 VIDEO_EXTS = {".avi", ".mp4", ".mov", ".mkv"}
 
@@ -77,7 +80,8 @@ def check_integrity(root: Path):
     print(f"  Corrupted files: {n_bad}")
 
     if corrupted:
-        out = Path("corrupted_files.txt")
+        out = PROJECT_ROOT / "reports" / "dataset" / "corrupted_files.txt"
+        out.parent.mkdir(parents=True, exist_ok=True)
         with open(out, "w") as f:
             for path, err in corrupted:
                 f.write(f"{path}\t{err}\n")
@@ -94,6 +98,7 @@ def check_integrity(root: Path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", type=str, default="./RWF-2000")
+    parser.add_argument("--root", type=str,
+                        default=str(PROJECT_ROOT / "data" / "raw" / "RWF-2000"))
     args = parser.parse_args()
     check_integrity(Path(args.root))

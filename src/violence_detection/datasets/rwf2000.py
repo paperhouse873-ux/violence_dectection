@@ -6,7 +6,10 @@ File này gồm 2 phần:
   Phần 1: class RWF2000Dataset  → dùng lại ở tất cả experiment
   Phần 2: __main__              → test DataLoader, kiểm tra speed
 
-Chạy: python phase1_dataset.py --root /path/to/RWF-2000 --split split.json
+Chạy:
+  python scripts/phase1_test_dataloader.py ^
+    --root data/raw/RWF-2000 ^
+    --split data/processed/splits/rwf2000_split.json
 """
 
 import cv2
@@ -262,10 +265,10 @@ def test_dataloader(root: str, split_file: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--root",  type=str,
-                        default="./RWF-2000",
+                        default="data/raw/RWF-2000",
                         help="Path đến thư mục gốc RWF-2000")
     parser.add_argument("--split", type=str,
-                        default="./split.json",
+                        default="data/processed/splits/rwf2000_split.json",
                         help="Path đến split.json từ phase0_step4")
     args = parser.parse_args()
 

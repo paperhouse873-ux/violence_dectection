@@ -1,12 +1,34 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Raw datasets: keep folder layout, not video data
+data/raw/**
+!data/raw/
+!data/raw/**/
+!data/raw/**/.gitkeep
 RWF-2000/
+RLVS/
+
+# Heavy experiment artifacts
+outputs/checkpoints/**
+outputs/cache/**
+outputs/results/**
+!outputs/
+!outputs/**/
+!outputs/**/.gitkeep
+
+# Legacy artifact paths
 checkpoints/
 cache/
 results/
-__pycache__/
+
+# Model/cache binaries
 *.pth
+*.pt
 *.npy
 *.pkl
-*.pyc
-*.pt
-dataset_stats.csv
+
+# Experiment tracking
 wandb/

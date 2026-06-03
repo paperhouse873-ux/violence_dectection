@@ -8,9 +8,9 @@ Fix quan trọng:
   3. Không apply sigmoid 2 lần (truyền logits trực tiếp vào loss)
 
 Chạy:
-  python phase2_finetune_x3ds.py ^
-    --root "C:/Users/HA VIET HUNG/Videos/archive/RWF-2000" ^
-    --split "C:/Users/HA VIET HUNG/Videos/archive/split.json" ^
+  python scripts/phase2_finetune_x3ds.py ^
+    --root data/raw/RWF-2000 ^
+    --split data/processed/splits/rwf2000_split.json ^
     --epochs 20 --batch_size 8 --lr 1e-3
 """
 
@@ -27,9 +27,8 @@ from sklearn.metrics import (
     f1_score, accuracy_score, roc_auc_score, confusion_matrix,
 )
 
-import sys
-sys.path.append(str(Path(__file__).parent))
-from phase1_dataset import RWF2000Dataset
+from _bootstrap import PROJECT_ROOT
+from violence_detection.datasets.rwf2000 import RWF2000Dataset
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"\n  Device: {DEVICE}")
@@ -148,8 +147,10 @@ def evaluate(model, loader, criterion, desc="Val"):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def train(args):
-    ckpt_dir = Path("checkpoints"); ckpt_dir.mkdir(exist_ok=True)
-    results_dir = Path("results"); results_dir.mkdir(exist_ok=True)
+    ckpt_dir = PROJECT_ROOT / "outputs" / "checkpoints"
+    results_dir = PROJECT_ROOT / "outputs" / "results"
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     print("\n  Loading datasets...")
     train_ds = RWF2000Dataset(args.root, args.split, "train", augment=True)
@@ -230,7 +231,7 @@ def train(args):
         json.dump({"experiment": "E0", "metrics": test_m,
                    "n_test": len(test_ds), "best_epoch": ckpt["epoch"]},
                   f, indent=2)
-    print(f"\n  Saved -> results/E0_baseline.json")
+    print(f"\n  Saved -> {results_dir / 'E0_baseline.json'}")
     print(f"  Phase 2 DONE.\n")
     return model
 

@@ -2,9 +2,9 @@
 Phase 4 — Train Context Gating Module + Ablation E0–E5
 ========================================================
 Chạy:
-  python phase4_train_cgm.py
+  python scripts/phase4_train_cgm.py
 
-Đọc cache/ từ Phase 3, train 6 ablation experiments:
+Đọc outputs/cache/ từ Phase 3, train 6 ablation experiments:
   E0: X3D-S only (baseline — đã có từ Phase 2)
   E1: + crowd stream only
   E2: + lighting stream only
@@ -13,8 +13,8 @@ Chạy:
   E5: E4 + cost-sensitive pos_weight=3
 
 Output:
-  results/ablation_results.json
-  results/ablation_table.csv
+  outputs/results/ablation_results.json
+  outputs/results/ablation_table.csv
 """
 
 import json
@@ -25,6 +25,8 @@ from pathlib import Path
 from sklearn.metrics import (
     f1_score, accuracy_score, roc_auc_score, confusion_matrix
 )
+
+from _bootstrap import PROJECT_ROOT
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -73,7 +75,7 @@ class ContextGatingModule(nn.Module):
 # ═══════════════════════════════════════════════════════════════════════════
 
 def load_cache():
-    cache = Path("cache")
+    cache = PROJECT_ROOT / "outputs" / "cache"
     data = {
         "p_base":  np.load(cache / "p_base.npy"),       # (N,)
         "z_crowd": np.load(cache / "z_crowd.npy"),       # (N,4)
@@ -258,7 +260,8 @@ def train_cgm(
 # ═══════════════════════════════════════════════════════════════════════════
 
 def run_ablation():
-    results_dir = Path("results"); results_dir.mkdir(exist_ok=True)
+    results_dir = PROJECT_ROOT / "outputs" / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"\n  {'='*60}")
     print(f"  Phase 4 — Context Gating Module Ablation Study")
@@ -359,8 +362,8 @@ def run_ablation():
                 m.get("auc_roc", ""), m.get("fpr", ""), m.get("fnr", ""),
             ])
 
-    print(f"\n  Saved → results/ablation_results.json")
-    print(f"  Saved → results/ablation_table.csv")
+    print(f"\n  Saved → {results_dir / 'ablation_results.json'}")
+    print(f"  Saved → {results_dir / 'ablation_table.csv'}")
     print(f"\n  Phase 4 DONE.\n")
 
 

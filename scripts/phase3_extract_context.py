@@ -2,20 +2,20 @@
 Phase 3 — Extract 3 Context Streams từ toàn bộ RWF-2000
 =========================================================
 Chạy:
-  python phase3_extract_context.py ^
-    --root "C:/Users/HA VIET HUNG/Videos/archive/RWF-2000" ^
-    --split "C:/Users/HA VIET HUNG/Videos/archive/split.json" ^
-    --ckpt  "checkpoints/x3ds_best.pth"
+  python scripts/phase3_extract_context.py ^
+    --root data/raw/RWF-2000 ^
+    --split data/processed/splits/rwf2000_split.json ^
+    --ckpt outputs/checkpoints/x3ds_best.pth
 
-Output (lưu vào thư mục cache/):
-  cache/p_base.npy        (N,)    — X3D-S violence probability
-  cache/z_crowd.npy       (N, 4)  — crowd density features
-  cache/z_light.npy       (N, 4)  — lighting features
-  cache/z_motion.npy      (N, 4)  — motion + synchrony features
-  cache/labels.npy        (N,)    — ground truth labels
-  cache/splits.npy        (N,)    — 0=train, 1=val, 2=test
-  cache/context_13dim.npy (N,13)  — concat + standardized (dùng ở Phase 4)
-  cache/scaler.pkl                — StandardScaler fit trên train
+Output (lưu vào outputs/cache/):
+  outputs/cache/p_base.npy        (N,)    — X3D-S violence probability
+  outputs/cache/z_crowd.npy       (N, 4)  — crowd density features
+  outputs/cache/z_light.npy       (N, 4)  — lighting features
+  outputs/cache/z_motion.npy      (N, 4)  — motion + synchrony features
+  outputs/cache/labels.npy        (N,)    — ground truth labels
+  outputs/cache/splits.npy        (N,)    — 0=train, 1=val, 2=test
+  outputs/cache/context_13dim.npy (N,13)  — concat + standardized
+  outputs/cache/scaler.pkl                — StandardScaler fit trên train
 
 Thời gian ước tính:
   p_base   : ~30 phút (GPU)
@@ -36,9 +36,12 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 from sklearn.preprocessing import StandardScaler
 
-import sys
-sys.path.append(str(Path(__file__).parent))
-from phase1_dataset import RWF2000Dataset
+from _bootstrap import PROJECT_ROOT
+from violence_detection.datasets.rwf2000 import (
+    KINETICS_MEAN,
+    KINETICS_STD,
+    RWF2000Dataset,
+)
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"\n  Device: {DEVICE}")
@@ -251,8 +254,8 @@ def extract_motion_features(video_path: str) -> np.ndarray:
 # ═══════════════════════════════════════════════════════════════════════════
 
 def run_extraction(args):
-    cache_dir = Path("cache")
-    cache_dir.mkdir(exist_ok=True)
+    cache_dir = PROJECT_ROOT / "outputs" / "cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
 
     # Load split
     with open(args.split) as f:
@@ -284,7 +287,6 @@ def run_extraction(args):
                 self.root     = Path(root)
                 self.n_frames = n_frames
                 self.img_size = img_size
-                from phase1_dataset import KINETICS_MEAN, KINETICS_STD
                 self.mean = torch.tensor(KINETICS_MEAN).view(3,1,1,1)
                 self.std  = torch.tensor(KINETICS_STD).view(3,1,1,1)
 
@@ -406,7 +408,7 @@ def run_extraction(args):
         print(f"  NOTE — Unexpected direction, check feature logic")
 
     print(f"\n  context_13dim shape : {X_norm.shape}")
-    print(f"  Saved all to cache/")
+    print(f"  Saved all to {cache_dir}")
     print(f"\n  Phase 3 DONE. Next: Phase 4 — Train Context Gating Module.\n")
 
 
@@ -415,7 +417,7 @@ if __name__ == "__main__":
     parser.add_argument("--root",  type=str, required=True)
     parser.add_argument("--split", type=str, required=True)
     parser.add_argument("--ckpt",  type=str,
-                        default="checkpoints/x3ds_best.pth")
+                        default=str(PROJECT_ROOT / "outputs" / "checkpoints" / "x3ds_best.pth"))
     parser.add_argument("--force", action="store_true",
                         help="Re-extract tất cả dù đã có cache")
     args = parser.parse_args()
